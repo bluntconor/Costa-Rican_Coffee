@@ -1,0 +1,70 @@
+library(readxl)
+P1MR <- read_excel("C:/Users/blunt/Google Drive/BREEDACFSs thesis/Photosythetic study/Simitaineous Ciras sampling/P1MR.xlsx")
+View(P1MR)
+
+# set factors
+
+P1MR$Block <- factor(P1MR$Block)
+P1MR$Geno <- factor(P1MR$Geno)
+P1MR$Time<-as.numeric(P1MR$Time)
+
+str(P1MR)
+
+summary(P1MR)
+
+#adding levels to P1MR PAR (Light Radiation)
+P1MR$PAR<-cut(P1MR$PAR, breaks = c(0,500,1000,3000), labels=c("low IR","medium IR","high IR"))
+
+#adding levels to P1MR Time
+P1MR$Time<-cut(P1MR$Time, breaks = c(700,1000,1300,1700), labels=c("Morning","Midday","Afternoon"))
+
+#Making Block Subsets
+Block1<-subset(P1MR, Block == 1)
+Block2<-subset(P1MR, Block == 2)
+summary(P1MR)
+#--------------------------ANNOVAS-------------------------------------------------------
+# Annova for Parcel 1 PN
+
+aov1 <- aov(PN ~ Block+Geno ,data=P1MR)
+
+# tabulated means of Parcel 1 PN of Block (Sun&Shade) and Genotype
+
+summary(aov1)
+TukeyHSD(aov1)
+model.tables(aov1, "mean") 
+
+# annova for GS
+
+m2 <- aov(GS ~ Block +Geno ,data=P1MR)
+
+# tabulated means of GS through Block and Genotype
+
+summary(aov2)
+TukeyHSD(aov2)
+model.tables(aov2, "mean") # table shows genotype is significant whilst block is not 
+
+
+#------------------------RESDIDUALS------------------------------------------------------------------
+
+# PN residuals
+
+##linear model checking residuals of all PN data accross Geno and GS
+
+lm1 <- lm(PN~Geno+Block, na.action=na.omit, data=P1MR)
+layout(matrix(1:6, nrow = 2))
+plot(lm1, which = 1:6)
+hist(residuals(lm1))
+drop1(lm1,test="F")
+summary(lm1)
+
+##linear model checking residuals of all GS data for Geno and Block
+
+lm2 <- lm(GS~Geno+Block, na.action=na.omit, data=P1MR)
+layout(matrix(1:6, nrow = 2))
+plot(lm2, which = 1:6)
+hist(residuals(lm2))
+drop1(lm2,test="F")
+summary(lm2)
+
+
+

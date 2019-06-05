@@ -1,0 +1,145 @@
+####################### P1MR (Parcel 1 Master R File) #################################
+
+library(readxl)
+P1MR <- read_excel("C:/Users/blunt/Google Drive/BREEDACFSs thesis/Photosythetic study/Simitaineous Ciras sampling/P1MR.xlsx")
+View(P1MR)
+
+# set Factors
+
+P1MR$Block <- factor(P1MR$Block)
+P1MR$Geno <- factor(P1MR$Geno)
+P1MR$Time<-as.numeric(P1MR$Time)
+
+str(P1MR)
+
+summary(P1MR)
+
+#adding levels to P1MR PAR (Light Radiation)
+P1MR$PAR<-cut(P1MR$PAR, breaks = c(0,500,1000,3000), labels=c("low IR","medium IR","high IR"))
+
+#adding levels to P1MR Time
+P1MR$Time<-cut(P1MR$Time, breaks = c(700,1000,1300,1700), labels=c("Morning","Midday","Afternoon"))
+
+#Making Block Subsets
+Block1<-subset(P1MR, Block == 1)
+Block2<-subset(P1MR, Block == 2)
+
+
+################## Investigation of Block influence (sun & shade) on Arabica PN #############################
+
+
+#Creating Parcel 1 Arabica Df
+P1A<- P1MR %>% select(Block,PN,Geno, Time) %>% filter(Geno == "A")  
+
+#Linear Model - Plotting residuals to check if the data is normalised Parcel 1 ARABICA
+P1A.lm = lm(PN~ Block-1, data=P1A) 
+P1A.res = resid(P1A.lm)
+plot(P1A$Block, P1A.res, 
+     ylab="Residuals", xlab="Parcel 1 Arabica Block resdiduals", 
+     main="PN") 
+
+# transforming linear model residuals to check and fit normality of Parcel 1 Arabica
+hist(P1A.res) # Nope
+hist(log10(P1A.res)) # Nope
+hist(sqrt(P1A.res)) # BINGO, Squared Transformation creates even distrobution 
+
+# Shapiro Wilk Test of P1A residuals
+shapiro.test(sqrt(P1A.res))    # W = 0.97776, p-value = 0.1213
+
+# Anova Model - checking Arabica PN explained by Block and ploting residuals of it 
+anova_P1A <- aov(PN ~ Block, data=P1A) # Block shown to be non significant
+P1A.aov.res <- resid(anova_P1A)
+plot(P1A$PN, P1A.aov.res, xlab="Parcel 1 Arabica PN", ylab="Residuals")
+hist(sqrt(P1A.aov.res)) # another visualisation of transformed normaity
+
+
+################## Investigation of Block AND Time influence on Arabica PN ###############################
+
+library(dplyr)
+ 
+#Creating Parcel 1 Arabica Morning df
+P1AM<- P1MR %>% select(Block,PN,Geno, Time) %>% filter(Geno == "A") %>% filter(Time == "Morning") 
+
+#LInear model - Plotting residuals to check if the data is normalised Parcel 1 ARABICA Morning
+P1AM.lm = lm(PN~ Block-1, data=P1AM) 
+PNAM.res = resid(P1AM.lm)
+plot(P1AM$Block, PNAM.res, 
+     ylab="Residuals", xlab="Parcel 1 Arabica Block resdiduals", 
+     main="Morning PN") 
+#Anova Model - checking Arabica Morning PN explained by Block and ploting residuals of it 
+anova_P1AM <- aov(PN ~ Block, data=P1AM) 
+P1AM.aov.res <- resid(anova_P1AM)
+plot(P1AM$PN, P1AM.aov.res, xlab="Parcel 1 Arabica Morning PN", ylab="Residuals")
+hist(sqrt(P1AM.aov.res)) # another visualisation of transformed normaity
+
+#------------------------------------------------------------------------------------------------------
+
+##### Above models show that Block is not significant on Arabica PN when not considering time of day.
+##### When considering time of day I.e "Morning" (zooming in on data set) Block is significant on PN
+#------------------------------------------------------------------------------------------------------
+
+# Within Block 1 genotype Linear model explaining PN
+#Creating Block1 Arabica Morning DF
+
+B1AM<- Block1 %>% select( PN,Geno, Time) %>% filter(Geno == "A") %>% filter(Time == "Morning")
+# Plotting residuals for Arabica Morning parcel 1 Block 1
+PN.B1AM.lm = lm(PN~ Geno, data=B1AM) 
+PN.res = resid(PN.lm)
+plot(P1MR$Geno, PN.res, 
+     ylab="Residuals", xlab="Genotype PN", 
+     main="Genotype PN") 
+
+(returning to this)
+#----------------------------------------------------------------------------------------------------
+
+
+################################## GLM Practice  #####################################
+
+
+#Plotting residuals to check if the data is normalised for a genral linear model(ALL GENOTYPES)
+PN.lm = lm(PN~ Geno-1+Block-1, data=P1MR) 
+PN.res = resid(PN.lm)
+plot(P1MR$Geno, PN.res, 
+          ylab="Residuals", xlab="Genotype PN", 
+          main="Genotype PN") 
+
+
+# GLM for PN using Geno Time Block and PAR as covariates (poisson family)
+PN.glm = glm(PN~Geno+Block+Time+PAR, poisson, data = P1MR)
+#checking residuals for GLM
+PN.glm.res = resid(PN.glm)
+hist(PN.glm.res)
+shapiro.test(PN.glm.res)
+
+#GLM for PN using Geno Time Block and PAR as covariates (Quasipoisson family)
+# Cannot trust std. errors as the data is overdispersed, estimates are fine. now used quasipoisson which corrects standard errors
+PN.qglm = glm(PN~Geno-1+Block+Time+PAR, quasipoisson, data = P1MR)
+#checking residuals for  qGLM
+PN.qglm.res = resid(PN.qglm)
+hist(PN.qglm.res)
+shapiro.test(PN.qglm.res)
+
+# table binding coefficients of both poisson and quasipoisson
+library(arm)
+c1 = coef(PN.glm) #non quasi
+c_qmle=coef(PN.qglm) #quasi glm
+s1=se.coef(PN.glm)
+s_qmle=se.coef(PN.qglm)
+cbind(c1,s1,c_qmle,s_qmle)
+
+# (qmle intercept / s1 intercept) 1.50947/1.14762 =  1.315305 = greater than 1, this is dispersion parameter and is the sigma value
+#although residual deviance of quasi  / degrees of freedom = 1.98 is also estimate of sigma
+
+
+PN.glmtest = glm(PN~Geno-1+Block+Time+PAR, normal,data = P1MR)
+#checking residuals for GLM
+PN.glm.res = resid(PN.glm)
+hist(PN.glm.res)
+shapiro.test(PN.glm.res)
+
+# Plotting residuals for GLM
+PN.glmtest = glm(PN~Geno-1+Block+Time+PAR,data = P1MR)
+PN.glm.res = resid(PN.glmtest)
+plot(P1MR$Geno+P1MR$Block+P1MR$Time+P1MR$PAR, PN.glm.res, 
+     ylab="Residuals", xlab="Genotype PN", 
+     main="Genotype PN") 
